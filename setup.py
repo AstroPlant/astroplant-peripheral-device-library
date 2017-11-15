@@ -2,12 +2,12 @@
 
 from distutils.core import setup
 
-setup(name='astroplant-sensor-library',
+setup(name='astroplant-peripheral-device-library',
       version='0.1',
-      description='AstroPlant sensor library',
+      description='AstroPlant peripheral device library',
       author='AstroPlant',
       author_email='thomas@kepow.org',
       url='https://astroplant.io',
-      packages=['astroplant_sensor_library',],
+      packages=['astroplant_peripheral_device_library',],
      )
 
