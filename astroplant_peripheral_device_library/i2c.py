@@ -1,4 +1,5 @@
 import smbus
+from time import sleep
 
 """
 SMBus protocol summary:
@@ -6,9 +7,10 @@ SMBus protocol summary:
 https://www.kernel.org/doc/Documentation/i2c/smbus-protocol
 """
 
-class I2CDevice(object):
-    SLEEP_TIME = 0.0001
+SLEEP_TIME = 0.0001
 
+class I2CDevice(object):
+    
     def __init__(self, address, bus = 1):
         """
         Initialize the I2C device.
