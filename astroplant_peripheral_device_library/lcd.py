@@ -11,8 +11,8 @@ LCD_ENTRY_MODE_SET = 0x04
 LCD_DISPLAY_CONTROL = 0x08
 LCD_CURSOR_SHIFT = 0x10
 LCD_FUNCTION_SET = 0x20
-LCD_SETCGRAMADDR = 0x40
-LCD_SETDDRAMADDR = 0x80
+LCD_SET_CGRAM_ADDR = 0x40
+LCD_SET_DDRAM_ADDR = 0x80
 
 ## Entry mode flags
 LCD_ENTRY_RIGHT = 0x00
@@ -86,20 +86,27 @@ class LCD(Display):
                 self._write_str(line.str)
             else:
                 # Line does not fit, scroll it continuously
-                cursor_position = min(self.columns-1-line.idx, 0)
-                len = self.columns - cursor_position
 
-                text = line.str[line.idx:len]
+                # Get cursor position on screen, based on current index in the line
+                cursor_position = max(self.columns - line.idx - 1, 0)
 
-                self.set_cursor_position(row, self.columns-1-cursor_position)
+                # Get the length of the line we can print on
+                line_length = self.columns - cursor_position
+
+                # Get the text to display
+                text = line.str[line.idx-(line_length-1):line.idx+1]
+
+                # Set the cursor position and display
+                self.set_cursor_position(row, cursor_position)
                 self._write_str(text)
 
                 line.idx += 1
 
+                # Text is now empty, so we are at the end of the line. Reset back to start
                 if len(text) == 0:
                     line.idx = 0
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.25)
 
     def _write_str(self, str):
         for char in str:
