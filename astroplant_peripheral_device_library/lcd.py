@@ -1,3 +1,4 @@
+from time import sleep
 from . import i2c
 import asyncio
 from astroplant_kit.peripheral import *
@@ -58,16 +59,38 @@ class LCD(Display):
         self.i2c_device = i2c.I2CDevice(0x27)
 
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
-        self.i2c_device.write_byte(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
+        self.write_command(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
 
         # Clear the LCD display
-        self.i2c_device.write_byte(LCD_CLEAR_DISPLAY)
+        self.write_command(LCD_CLEAR_DISPLAY)
 
         # Turn LCD display on
-        self.i2c_device.write_byte(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
+        self.write_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
 
     def display(self, str):
         pass
+
+    def _pulse_data(self, data: int):
+        """
+        Pulse the Enable flag to send data.
+
+        :param data: The data to send.
+        """
+        if self.backlight:
+            data |= LCD_BACKLIGHT_ON
+        else:
+            data |= LCD_BACKLIGHT_OFF
+        
+        self.i2c_device.write_byte(data | ENABLE)
+        sleep(0.0005)
+        self.i2c_device.write_byte(data & ~ENABLE)
+        sleep(0.0001)
+
+    def write_command(self, command: int):
+        # Send first four bits
+        self._pulse_data(command & 0xF0)
+        # Send last four bits
+        self._pulse_data((command << 4) & 0xF0)
 
     def backlight(self, state: bool):
         """
