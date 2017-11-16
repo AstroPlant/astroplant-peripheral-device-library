@@ -74,16 +74,18 @@ class LCD(Display):
 
     def display(self, str):
         self.lines = [LCDLine(str) for str in str.splitlines()]
-    
-    async def _run(self):
         self.clear()
 
+    async def _run(self):
         for row in range(min(self.rows, len(self.lines))):
             line = self.lines[row]
 
             if line.len <= self.columns:
                 # Line fits fully
-                self._write_str(line.str)
+                if not line.written:
+                    self.set_cursor_position(row, 0)
+                    self._write_str(line.str)
+                    line.written = True
             else:
                 # Line does not fit, scroll it continuously
 
@@ -95,10 +97,12 @@ class LCD(Display):
 
                 # Get the text to display
                 text = line.str[line.idx-(line_length-1):line.idx+1]
+                prepend_spaces = " " * cursor_position
+                append_spaces = " " * (line_length - len(text))
 
                 # Set the cursor position and display
-                self.set_cursor_position(row, cursor_position)
-                self._write_str(text)
+                self.set_cursor_position(row, 0)
+                self._write_str(prepend_spaces + text + append_spaces)
 
                 line.idx += 1
 
@@ -179,3 +183,4 @@ class LCDLine(object):
         self.str = str
         self.len = len(str)
         self.idx = 0
+        self.written = False
