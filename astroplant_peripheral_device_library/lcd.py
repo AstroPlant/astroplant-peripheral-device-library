@@ -1,4 +1,4 @@
-import i2c
+from . import i2c
 import asyncio
 from astroplant_kit.peripheral import *
 
@@ -52,17 +52,22 @@ ENABLE = 0x04
 
 class LCD(Display):
 
-    def display(self, str):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.i2c_device = i2c.I2CDevice(0x27)
 
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
         self.i2c_device.write_byte(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
 
         # Clear the LCD display
-        self.i2c_device.write_cmd(LCD_CLEAR_DISPLAY)
+        self.i2c_device.write_byte(LCD_CLEAR_DISPLAY)
 
         # Turn LCD display on
-        self.i2c_device.write_cmd(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
+        self.i2c_device.write_byte(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
+
+    def display(self, str):
+        pass
 
     def backlight(self, state: bool):
         """
