@@ -68,7 +68,9 @@ class LCD(Display):
         self.write_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
 
     def display(self, str):
-        pass
+        print("Writing: %s..." % str)
+        for char in str:
+            self.write_char(ord(char))
 
     def _pulse_data(self, data: int):
         """
@@ -91,6 +93,12 @@ class LCD(Display):
         self._pulse_data(command & 0xF0)
         # Send last four bits
         self._pulse_data((command << 4) & 0xF0)
+
+    def write_char(self, char: int):
+        # Send first four bits
+        self._pulse_data(REGISTER_SELECT | (char & 0xF0))
+        # Send last four bits
+        self._pulse_data(REGISTER_SELECT | ((char << 4) & 0xF0))
 
     def backlight(self, state: bool):
         """
