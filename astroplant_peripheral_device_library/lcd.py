@@ -46,6 +46,9 @@ LCD_1_LINE = 0x00
 LCD_5x10_DOTS = 0x04
 LCD_5x8_DOTS = 0x00
 
+## Row offsets
+LCD_ROW_OFFSETS = [0x80, 0xC0, 0x94, 0xD4,]
+
 ## RS/RW/EN bits
 REGISTER_SELECT = 0x01
 READ_WRITE = 0x02
@@ -56,22 +59,24 @@ class LCD(Display):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.lines = 2
+        self.columns = 16
+
         self.i2c_device = i2c.I2CDevice(0x27)
 
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
         self.write_command(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
 
-        # Clear the LCD display
-        self.write_command(LCD_CLEAR_DISPLAY)
-
-        # Turn LCD display on
-        self.write_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
+        self.clear()
+        self.turn_on()
+        self.home()
 
     def display(self, str):
-        print("Writing: %s..." % str)
+        self.clear()
+        self.home()
         for char in str:
             self.write_char(ord(char))
-
+    
     def _pulse_data(self, data: int):
         """
         Pulse the Enable flag to send data.
@@ -99,6 +104,28 @@ class LCD(Display):
         self._pulse_data(REGISTER_SELECT | (char & 0xF0))
         # Send last four bits
         self._pulse_data(REGISTER_SELECT | ((char << 4) & 0xF0))
+
+    def clear(self):
+        self.write_command(LCD_CLEAR_DISPLAY)
+
+    def home(self):
+        self.write_command(LCD_RETURN_HOME)
+
+    def set_cursor_position(self, row=0, column=0):
+        row = min(row, len(LCD_ROW_OFFSETS))
+        self.write_command(LCD_SET_DDRAM_ADDR | (column + LCD_ROW_OFFSETS[row]))
+
+    def turn_on(self):
+        self.write_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_ON)
+
+    def turn_off(self):
+        self.write_command(LCD_DISPLAY_CONTROL | LCD_DISPLAY_OFF)
+
+    def scroll_right(self):
+        self.write_command(LCD_CURSOR_SHIFT | LCD_DISPLAY_MOVE | LCD_MOVE_RIGHT)
+
+    def scroll_left(self):
+        self.write_command(LCD_CURSOR_SHIFT | LCD_DISPLAY_MOVE | LCD_MOVE_LEFT)
 
     def backlight(self, state: bool):
         """
