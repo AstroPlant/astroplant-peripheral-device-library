@@ -65,12 +65,21 @@ class LCD(Display):
 
         self.i2c_device = i2c.I2CDevice(0x27)
 
+        # Initialize
+        self.write_command(0x03)
+        self.write_command(0x03)
+        self.write_command(0x03)
+        self.write_command(0x02)
+
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
         self.write_command(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
 
         self.clear()
         self.turn_on()
         self.home()
+
+        # Set LCD entry mode to left entry
+        self.write_command(LCD_ENTRY_MODE_SET | LCD_ENTRY_LEFT)
 
     def display(self, str):
         self.lines = [LCDLine(str) for str in str.splitlines()]
