@@ -11,8 +11,8 @@ LCD_ENTRY_MODE_SET = 0x04
 LCD_DISPLAY_CONTROL = 0x08
 LCD_CURSOR_SHIFT = 0x10
 LCD_FUNCTION_SET = 0x20
-LCD_SETCGRAMADDR = 0x40
-LCD_SETDDRAMADDR = 0x80
+LCD_SET_CGRAM_ADDR = 0x40
+LCD_SET_DDRAM_ADDR = 0x80
 
 ## Entry mode flags
 LCD_ENTRY_RIGHT = 0x00
@@ -65,6 +65,12 @@ class LCD(Display):
 
         self.i2c_device = i2c.I2CDevice(0x27)
 
+        # Initialize
+        self.write_command(0x03)
+        self.write_command(0x03)
+        self.write_command(0x03)
+        self.write_command(0x02)
+
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
         self.write_command(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
 
@@ -72,34 +78,48 @@ class LCD(Display):
         self.turn_on()
         self.home()
 
+        # Set LCD entry mode to left entry
+        self.write_command(LCD_ENTRY_MODE_SET | LCD_ENTRY_LEFT)
+
     def display(self, str):
         self.lines = [LCDLine(str) for str in str.splitlines()]
-    
-    async def _run(self):
         self.clear()
 
+    async def _run(self):
         for row in range(min(self.rows, len(self.lines))):
             line = self.lines[row]
 
             if line.len <= self.columns:
                 # Line fits fully
-                self._write_str(line.str)
+                if not line.written:
+                    self.set_cursor_position(row, 0)
+                    self._write_str(line.str)
+                    line.written = True
             else:
                 # Line does not fit, scroll it continuously
-                cursor_position = min(self.columns-1-line.idx, 0)
-                len = self.columns - cursor_position
 
-                text = line.str[line.idx:len]
+                # Get cursor position on screen, based on current index in the line
+                cursor_position = max(self.columns - line.idx - 1, 0)
 
-                self.set_cursor_position(row, self.columns-1-cursor_position)
-                self._write_str(text)
+                # Get the length of the line we can print on
+                line_length = self.columns - cursor_position
+
+                # Get the text to display
+                text = line.str[line.idx-(line_length-1):line.idx+1]
+                prepend_spaces = " " * cursor_position
+                append_spaces = " " * (line_length - len(text))
+
+                # Set the cursor position and display
+                self.set_cursor_position(row, 0)
+                self._write_str(prepend_spaces + text + append_spaces)
 
                 line.idx += 1
 
+                # Text is now empty, so we are at the end of the line. Reset back to start
                 if len(text) == 0:
                     line.idx = 0
 
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.25)
 
     def _write_str(self, str):
         for char in str:
@@ -172,3 +192,4 @@ class LCDLine(object):
         self.str = str
         self.len = len(str)
         self.idx = 0
+        self.written = False
