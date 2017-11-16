@@ -59,7 +59,8 @@ class LCD(Display):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.lines = 2
+        self.lines = []
+        self.rows = 2
         self.columns = 16
 
         self.i2c_device = i2c.I2CDevice(0x27)
@@ -72,11 +73,38 @@ class LCD(Display):
         self.home()
 
     def display(self, str):
+        self.lines = [LCDLine(str) for str in str.splitlines()]
+    
+    async def _run(self):
         self.clear()
-        self.home()
+
+        for row in range(min(self.rows, len(self.lines))):
+            line = self.lines[row]
+
+            if line.len <= self.columns:
+                # Line fits fully
+                self._write_str(line.str)
+            else:
+                # Line does not fit, scroll it continuously
+                cursor_position = min(self.columns-1-line.idx, 0)
+                len = self.columns - cursor_position
+
+                text = line.str[line.idx:len]
+
+                self.set_cursor_position(row, self.columns-1-cursor_position)
+                self._write_str(text)
+
+                line.idx += 1
+
+                if len(text) == 0:
+                    line.idx = 0
+
+        await asyncio.sleep(0.5)
+
+    def _write_str(self, str):
         for char in str:
             self.write_char(ord(char))
-    
+
     def _pulse_data(self, data: int):
         """
         Pulse the Enable flag to send data.
@@ -138,3 +166,9 @@ class LCD(Display):
             self.i2c_device.write_cmd(LCD_BACKLIGHT_ON)
         else:
             self.i2c_device.write_cmd(LCD_BACKLIGHT_OFF)
+
+class LCDLine(object):
+    def __init__(self, str):
+        self.str = str
+        self.len = len(str)
+        self.idx = 0
