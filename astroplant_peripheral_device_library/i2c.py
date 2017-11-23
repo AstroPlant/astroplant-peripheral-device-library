@@ -10,7 +10,7 @@ https://www.kernel.org/doc/Documentation/i2c/smbus-protocol
 SLEEP_TIME = 0.0001
 
 class I2CDevice(object):
-    
+
     def __init__(self, address, bus = 1):
         """
         Initialize the I2C device.
@@ -74,4 +74,23 @@ class I2CDevice(object):
         :param data: The data word (two bytes) to write.
         """
         self.bus.write_byte_data(self.address, command, data)
+        sleep(SLEEP_TIME)
+
+    def read_i2c_block_data(self, register: int, length: int):
+        """
+        Read a block of data from the I2C device.
+
+        :param register: The register address to start reading from.
+        :param length: The number of bytes to read.
+        """
+        self.bus.read_i2c_block_data(self.address, register, length)
+
+    def write_i2c_block_data(self, register: int, data):
+        """
+        Write a list of data to the I2C device.
+
+        :param register: The starting register address to write to.
+        :param data: The list of data to write.
+        """
+        self.bus.write_i2c_block_data(self.address, register, data)
         sleep(SLEEP_TIME)
