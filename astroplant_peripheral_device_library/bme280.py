@@ -3,7 +3,6 @@ Based on BME280 implementation by Matt Hawkins
 https://bitbucket.org/MattHawkinsUK/rpispy-misc/raw/master/python/bme280.py
 """
 
-import smbus
 import time
 from ctypes import c_short
 from ctypes import c_byte
