@@ -83,7 +83,7 @@ class I2CDevice(object):
         :param register: The register address to start reading from.
         :param length: The number of bytes to read.
         """
-        self.bus.read_i2c_block_data(self.address, register, length)
+        return self.bus.read_i2c_block_data(self.address, register, length)
 
     def write_i2c_block_data(self, register: int, data):
         """
