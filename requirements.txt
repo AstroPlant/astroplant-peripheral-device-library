@@ -2,3 +2,4 @@ requests==2.18.4
 pyjwt==1.5.3
 websocket-client==0.44.0
 pyserial==3.4
+rpi.gpio==0.6.3
