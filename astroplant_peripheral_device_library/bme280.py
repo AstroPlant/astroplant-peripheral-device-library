@@ -9,32 +9,33 @@ from ctypes import c_short
 from ctypes import c_byte
 from ctypes import c_ubyte
 
-from time import sleep
 from . import i2c
 import asyncio
 from astroplant_kit.peripheral import *
 
 class BME280(Sensor):
 
-    def __init__(self, i2c_address, *args, **kwargs):
+    def __init__(self, *args, i2c_address, **kwargs):
         super().__init__(*args, **kwargs)
         address = int(i2c_address, base=16)
         self.i2c_device = i2c.I2CDevice(address)
 
     async def measure(self):
-        (temperature, pressure, humidity,) = self.readAll()
+        (temperature, pressure, humidity,) = await self.readAll()
 
         temperature_measurement = Measurement(self, "Temperature", "Degrees Celsius", temperature)
         pressure_measurement = Measurement(self, "Pressure", "Hectopascal", pressure)
         humidity_measurement = Measurement(self, "Humidity", "Percentage", humidity)
 
-    def readBME280ID(self):
+        return [temperature_measurement, pressure_measurement, humidity_measurement,]
+
+    def readID(self):
         # Chip ID Register Address
         REG_ID     = 0xD0
         (chip_id, chip_version) = self.i2c_device.read_i2c_block_data(REG_ID, 2)
         return (chip_id, chip_version)
 
-    def readBME280All(self):
+    async def readAll(self):
         # Register Addresses
         REG_DATA = 0xF7
         REG_CONTROL = 0xF4
@@ -93,7 +94,7 @@ class BME280(Sensor):
 
         # Wait in ms (Datasheet Appendix B: Measurement time and current calculation)
         wait_time = 1.25 + (2.3 * OVERSAMPLE_TEMP) + ((2.3 * OVERSAMPLE_PRES) + 0.575) + ((2.3 * OVERSAMPLE_HUM)+0.575)
-        time.sleep(wait_time/1000)  # Wait the required time
+        await asyncio.sleep(wait_time/1000)  # Wait the required time
 
         # Read temperature/pressure/humidity
         data = self.i2c_device.read_i2c_block_data(REG_DATA, 8)
