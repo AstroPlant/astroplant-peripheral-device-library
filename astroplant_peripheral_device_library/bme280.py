@@ -16,9 +16,9 @@ from astroplant_kit.peripheral import *
 
 class BME280(Sensor):
 
-    def __init__(self, address, *args, **kwargs):
+    def __init__(self, i2c_address, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        address = int(address, base=16)
+        address = int(i2c_address, base=16)
         self.i2c_device = i2c.I2CDevice(address)
 
     async def measure(self):
