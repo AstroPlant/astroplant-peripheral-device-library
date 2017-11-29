@@ -1,5 +1,5 @@
-import smbus
 from time import sleep
+import pigpio
 
 """
 SMBus protocol summary:
@@ -18,8 +18,12 @@ class I2CDevice(object):
         Raspberry Pi revision 2, Raspberry Pi 2 & Raspberry Pi 3 use bus 1
         Raspberry Pi revision 1 uses bus 0
         """
+        self.bus = bus
         self.address = address
-        self.bus = smbus.SMBus(bus)
+        self.pi = pigpio.pi()
+        
+        # Open I2C handle
+        self.handle = self.pi.i2c_open(self.bus, self.address)
 
     def read_byte(self):
         """
@@ -27,7 +31,7 @@ class I2CDevice(object):
 
         :return: A byte read from the I2C device.
         """
-        return self.bus.read_byte(self.address)
+        return self.pi.i2c_read_byte(self.handle)
 
     def write_byte(self, byte: int):
         """
@@ -35,62 +39,62 @@ class I2CDevice(object):
 
         :param byte: The byte to write.
         """
-        self.bus.write_byte(self.address, byte)
+        self.pi.i2c_write_byte(self.handle, byte)
         sleep(SLEEP_TIME)
 
-    def read_byte_data(self, command: int):
+    def read_byte_data(self, register: int):
         """
         Read a byte from the I2C device.
 
-        :param command: The command byte.
+        :param register: The address of the register to read from.
         :return: A byte read from the I2C device.
         """
-        return self.bus.read_byte_data(self.address, command)
+        return self.pi.i2c_read_byte_data(self.handle, register)
 
-    def write_byte_data(self, command: int, data: int):
+    def write_byte_data(self, register: int, data: int):
         """
-        Write a command and data byte to the I2C device.
+        Write a data byte to a specified register on the I2C device.
 
-        :param command: The command byte to write.
+        :param register: The address of the register to write to.
         :param data: The data byte to write.
         """
-        self.bus.write_byte_data(self.address, command, data)
+        self.pi.i2c_write_byte_data(self.handle, register, data)
         sleep(SLEEP_TIME)
 
-    def read_word_data(self, command: int):
+    def read_word_data(self, register: int):
         """
-        Read a word (two bytes) from the I2C device.
+        Read a word (two bytes) from the specified register on the I2C device.
 
-        :param command: The command byte.
+        :param register: The address of the register to read from.
         :return: A word (two bytes) read from the I2C device.
         """
-        return self.bus.read_word_data(self.address, command)
+        return self.pi.i2c_read_word_data(self.handle, register)
 
-    def write_word_data(self, command: int, data: int):
+    def write_word_data(self, register: int, data: int):
         """
-        Write a command byte and data word (two bytes) to the I2C device.
+        Write data word (two bytes) to the specified register on the I2C device.
 
-        :param command: The command byte to write.
+        :param register: The address of the register to write to.
         :param data: The data word (two bytes) to write.
         """
-        self.bus.write_byte_data(self.address, command, data)
+        self.pi.i2c_write_byte_data(self.handle, register, data)
         sleep(SLEEP_TIME)
 
-    def read_i2c_block_data(self, register: int, length: int):
+    def read_i2c_block_data(self, register: int, count: int):
         """
         Read a block of data from the I2C device.
 
-        :param register: The register address to start reading from.
+        :param register: The address of the register to read from.
         :param length: The number of bytes to read.
         """
-        return self.bus.read_i2c_block_data(self.address, register, length)
+        return self.pi.i2c_read_i2c_block_data(self.handle, register, count)
 
     def write_i2c_block_data(self, register: int, data):
         """
         Write a list of data to the I2C device.
 
-        :param register: The starting register address to write to.
+        :param register: The address of the register to write to.
         :param data: The list of data to write.
         """
-        self.bus.write_i2c_block_data(self.address, register, data)
+        self.pi.i2c_write_i2c_block_data(self.handle, register, data)
         sleep(SLEEP_TIME)
