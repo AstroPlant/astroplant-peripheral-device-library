@@ -18,8 +18,15 @@ class W1ThermSensor(Sensor):
             sensor_id = None
         
         self.w1ThermSensor = w1thermsensor.W1ThermSensor(sensor_type = sensor_type, sensor_id = sensor_id)
-        
+
+    def _measure(self):
+        return self.w1ThermSensor.get_temperature()
+
     async def measure(self):
-        temperature = self.w1ThermSensor.get_temperature()
+        # w1thermsensor's get_temperature is blocking, and quite slow. Run it in a separate thread
+        # and asynchronously await the result.
+        loop = asyncio.get_event_loop()
+        temperature = await loop.run_in_executor(None, self._measure)
+
         temperature_measurement = Measurement(self, "Temperature", "Degrees Celsius", temperature)
         return [temperature_measurement,]
