@@ -66,6 +66,7 @@ class _DHT22:
 
       atexit.register(self.cancel)
 
+      self.suc_M = 0   # Successful message count.
       self.bad_CS = 0  # Bad checksum count.
       self.bad_SM = 0  # Short message count.
       self.bad_MM = 0  # Missing message count.
@@ -137,6 +138,7 @@ class _DHT22:
 
                   self.tov = time.time()
 
+                  self.suc_M += 1
                   if self.LED is not None:
                      self.pi.write(self.LED, 0)
 
@@ -201,6 +203,10 @@ class _DHT22:
       """Return current relative humidity."""
       return self.rhum
 
+   def successful_message(self):
+      """Return the count of successful messages."""
+      return self.suc_M
+      
    def staleness(self):
       """Return time since measurement made."""
       if self.tov is not None:
@@ -254,24 +260,22 @@ class DHT22(Sensor):
         self.dht22 = _DHT22(pigpio.pi(), pin)
         
     async def measure(self):
-        missing_message_count_before = self.dht22.missing_message()
-        bad_checksum_count_before = self.dht22.bad_checksum()
-    
+        successful_message_count_before = self.dht22.successful_message()
+        
         # Trigger a new reading
         await self.dht22.trigger()
         await asyncio.sleep(2.0)
         
-        if (
-            self.dht22.missing_message() > missing_message_count_before
-            or self.dht22.bad_checksum() > bad_checksum_count_before
-            ):
-            # Measurement was invalid
+        # See if there has been a new successful reading
+        if self.dht22.successful_message() > successful_message_count_before:
+            temperature = self.dht22.temperature()
+            humidity = self.dht22.humidity()
+            
+            temperature_measurement = Measurement(self, "Temperature", "Degrees Celsius", temperature)
+            humidity_measurement = Measurement(self, "Humidity", "Percent", humidity)
+            
+            return [temperature_measurement, humidity_measurement,]
+        else:
+            # No valid measurement was made
             return []
-        
-        temperature = self.dht22.temperature()
-        humidity = self.dht22.humidity()
-        
-        temperature_measurement = Measurement(self, "Temperature", "Degrees Celsius", temperature)
-        humidity_measurement = Measurement(self, "Humidity", "Percent", humidity)
-        
-        return [temperature_measurement, humidity_measurement,]
+
