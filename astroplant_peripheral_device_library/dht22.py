@@ -3,6 +3,7 @@ Based on:
 https://github.com/joan2937/pigpio/blob/master/EXAMPLES/Python/DHT22_AM2302_SENSOR/DHT22.py
 """
 
+import threading
 import time
 import atexit
 import pigpio
@@ -230,14 +231,14 @@ class _DHT22:
       """Return count of power cycles because of sensor hangs."""
       return self.bad_SR
 
-   async def trigger(self):
+   def trigger(self):
       """Trigger a new relative humidity and temperature reading."""
       if self.powered:
          if self.LED is not None:
             self.pi.write(self.LED, 1)
 
          self.pi.write(self.gpio, pigpio.LOW)
-         await asyncio.sleep(0.017)  # 17 ms
+         time.sleep(0.017)  # 17 ms
          self.pi.set_mode(self.gpio, pigpio.INPUT)
          self.pi.set_watchdog(self.gpio, 200)
 
@@ -256,17 +257,21 @@ class DHT22(Sensor):
     def __init__(self, *args, pin, **kwargs):
         super().__init__(*args, **kwargs)
     
-        pin = int(pin)
-        self.dht22 = _DHT22(pigpio.pi(), pin)
-        
+        self.pin = int(pin)
+        self.dht22 = _DHT22(pigpio.pi(), self.pin)
+
     async def measure(self):
         successful_message_count_before = self.dht22.successful_message()
         
-        # Trigger a new reading
-        await self.dht22.trigger()
+        # Trigger a new reading in a separate thread (timing is important for the DHT22)
+        thread = threading.Thread(target=self.dht22.trigger)
+        thread.start()
         await asyncio.sleep(2.0)
         
         # See if there has been a new successful reading
+        # TODO: we have a mild race condition here... we should use a lock
+        # that is acquired here, as well as in DHT22._cb in the "# Is
+        # checksum ok?"- block.
         if self.dht22.successful_message() > successful_message_count_before:
             temperature = self.dht22.temperature()
             humidity = self.dht22.humidity()
