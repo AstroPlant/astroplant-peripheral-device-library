@@ -1,3 +1,4 @@
+import threading
 from time import sleep
 from . import i2c
 import asyncio
@@ -80,46 +81,55 @@ class LCD(Display):
 
         # Set LCD entry mode to left entry
         self.write_command(LCD_ENTRY_MODE_SET | LCD_ENTRY_LEFT)
+        
+        self.write_lock = threading.Lock()
+        
+        # Start LCD updates.
+        thread = threading.Thread(target=self._run)
+        thread.start()
 
     def display(self, str):
-        self.lines = [LCDLine(str) for str in str.splitlines()]
-        self.clear()
+        with self.write_lock:
+            self.lines = [LCDLine(str) for str in str.splitlines()]
+            self.clear()
 
-    async def _run(self):
-        for row in range(min(self.rows, len(self.lines))):
-            line = self.lines[row]
+    def _run(self):
+        while True:
+            with self.write_lock:
+                for row in range(min(self.rows, len(self.lines))):
+                    line = self.lines[row]
 
-            if line.len <= self.columns:
-                # Line fits fully
-                if not line.written:
-                    self.set_cursor_position(row, 0)
-                    self._write_str(line.str)
-                    line.written = True
-            else:
-                # Line does not fit, scroll it continuously
+                    if line.len <= self.columns:
+                        # Line fits fully
+                        if not line.written:
+                            self.set_cursor_position(row, 0)
+                            self._write_str(line.str)
+                            line.written = True
+                    else:
+                        # Line does not fit, scroll it continuously
 
-                # Get cursor position on screen, based on current index in the line
-                cursor_position = max(self.columns - line.idx - 1, 0)
+                        # Get cursor position on screen, based on current index in the line
+                        cursor_position = max(self.columns - line.idx - 1, 0)
 
-                # Get the length of the line we can print on
-                line_length = self.columns - cursor_position
+                        # Get the length of the line we can print on
+                        line_length = self.columns - cursor_position
 
-                # Get the text to display
-                text = line.str[line.idx-(line_length-1):line.idx+1]
-                prepend_spaces = " " * cursor_position
-                append_spaces = " " * (line_length - len(text))
+                        # Get the text to display
+                        text = line.str[line.idx-(line_length-1):line.idx+1]
+                        prepend_spaces = " " * cursor_position
+                        append_spaces = " " * (line_length - len(text))
 
-                # Set the cursor position and display
-                self.set_cursor_position(row, 0)
-                self._write_str(prepend_spaces + text + append_spaces)
+                        # Set the cursor position and display
+                        self.set_cursor_position(row, 0)
+                        self._write_str(prepend_spaces + text + append_spaces)
 
-                line.idx += 1
+                        line.idx += 1
 
-                # Text is now empty, so we are at the end of the line. Reset back to start
-                if len(text) == 0:
-                    line.idx = 0
+                        # Text is now empty, so we are at the end of the line. Reset back to start
+                        if len(text) == 0:
+                            line.idx = 0
 
-        await asyncio.sleep(0.25)
+            sleep(0.15)
 
     def _write_str(self, str):
         for char in str:
