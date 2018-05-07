@@ -57,14 +57,16 @@ ENABLE = 0x04
 
 class LCD(Display):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, i2c_address = "0x27", **kwargs):
         super().__init__(*args, **kwargs)
+
+        address = int(i2c_address, base=16)
 
         self.lines = []
         self.rows = 2
         self.columns = 16
 
-        self.i2c_device = i2c.I2CDevice(0x27)
+        self.i2c_device = i2c.I2CDevice(address)
 
         # Initialize
         self.write_command(0x03)
