@@ -106,28 +106,35 @@ class LCD(Display):
                             self._write_str(line.str)
                             line.written = True
                     else:
-                        # Line does not fit, scroll it continuously
+                        NUM_STATIC_TICKS = 10
+                        # We only require printing when the line is new or when we are scrolling.
+                        if (line.staticTicks == 0 or line.staticTicks >= NUM_STATIC_TICKS):
+                            # Line does not fit, scroll it continuously
 
-                        # Get cursor position on screen, based on current index in the line
-                        cursor_position = max(self.columns - line.idx - 1, 0)
+                            # Get cursor position on screen, based on current index in the line
+                            cursor_position = max(self.columns - line.idx - 1, 0)
 
-                        # Get the length of the line we can print on
-                        line_length = self.columns - cursor_position
+                            # Get the length of the line we can print on
+                            line_length = self.columns - cursor_position
 
-                        # Get the text to display
-                        text = line.str[line.idx-(line_length-1):line.idx+1]
-                        prepend_spaces = " " * cursor_position
-                        append_spaces = " " * (line_length - len(text))
+                            # Get the text to display
+                            text = line.str[line.idx-(line_length-1):line.idx+1]
+                            prepend_spaces = " " * cursor_position
+                            append_spaces = " " * (line_length - len(text))
 
-                        # Set the cursor position and display
-                        self.set_cursor_position(row, 0)
-                        self._write_str(prepend_spaces + text + append_spaces)
+                            # Set the cursor position and display
+                            self.set_cursor_position(row, 0)
+                            self._write_str(prepend_spaces + text + append_spaces)
 
-                        line.idx += 1
-
-                        # Text is now empty, so we are at the end of the line. Reset back to start
-                        if len(text) == 0:
-                            line.idx = 0
+                            # Text is now empty, so we are at the end of the line. Reset back to start
+                            if len(text) == 0:
+                                line.idx = 0
+                        
+                        # Only scroll after the line has been displayed staticly for a while.
+                        if (line.staticTicks >= NUM_STATIC_TICKS):
+                            line.idx += 1
+                        else:
+                            line.staticTicks += 1
 
             sleep(0.15)
 
@@ -201,5 +208,6 @@ class LCDLine(object):
     def __init__(self, str):
         self.str = str
         self.len = len(str)
-        self.idx = 0
+        self.idx = 15 # Scrolling lines are displayed fully left-aligned at the start.
+        self.staticTicks = 0
         self.written = False
