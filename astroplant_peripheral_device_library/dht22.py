@@ -265,6 +265,7 @@ class DHT22(Sensor):
         
         # Trigger a new reading in a separate thread (timing is important for the DHT22)
         thread = threading.Thread(target=self.dht22.trigger)
+        thread.daemon = True
         thread.start()
         await asyncio.sleep(2.0)
         

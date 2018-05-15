@@ -88,6 +88,7 @@ class LCD(Display):
         
         # Start LCD updates.
         thread = threading.Thread(target=self._run)
+        thread.daemon = True
         thread.start()
 
     def display(self, str):
