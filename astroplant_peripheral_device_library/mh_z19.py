@@ -4,6 +4,12 @@ from astroplant_kit.peripheral import *
 
 class MHZ19(Sensor):
 
+    #: Amount of time in seconds to wait between making measurements
+    TIME_SLEEP_BETWEEN_MEASUREMENTS = 1.0
+
+    #: Amount of time in seconds over which measurements are reduced before publishing them for storage
+    TIME_REDUCE_MEASUREMENTS = 300.0
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.serial = serial.Serial('/dev/ttyS0',
