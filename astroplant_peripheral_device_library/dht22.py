@@ -253,11 +253,14 @@ class _DHT22:
             self.cb = None
 
 
-class DHT22(Sensor):
+class Dht22(Sensor):
     SLEEP_BETWEEN_MEASUREMENTS = 3.5
 
     def __init__(self, *args, configuration):
         super().__init__(*args)
+
+        self.measurement_interval = configuration["intervals"]["measurementInterval"]
+        self.aggregate_interval = configuration["intervals"]["aggregateInterval"]
 
         self.pin = configuration["gpioAddress"]
         self.dht22 = _DHT22(pigpio.pi(), self.pin)

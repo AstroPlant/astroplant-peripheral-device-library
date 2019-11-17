@@ -4,7 +4,7 @@ import serial
 from astroplant_kit.peripheral import Sensor
 
 
-class MHZ19(Sensor):
+class MhZ19(Sensor):
 
     #: Amount of time in seconds to wait between making measurements
     TIME_SLEEP_BETWEEN_MEASUREMENTS = 1.0
@@ -14,6 +14,10 @@ class MHZ19(Sensor):
 
     def __init__(self, *args, configuration):
         super().__init__(*args)
+
+        self.measurement_interval = configuration["intervals"]["measurementInterval"]
+        self.aggregate_interval = configuration["intervals"]["aggregateInterval"]
+
         file_name = (
             configuration["serialFile"]
             if "serialFile" in configuration

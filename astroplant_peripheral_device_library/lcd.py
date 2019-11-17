@@ -68,7 +68,7 @@ class LCD(Display):
         self.rows = 2
         self.columns = 16
 
-        self.i2c_device = i2c.I2CDevice(address)
+        self.i2c_device = i2c.I2cDevice(address)
 
         # Initialize
         self.write_command(0x03)

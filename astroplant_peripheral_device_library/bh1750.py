@@ -5,7 +5,7 @@ from . import i2c
 # Based on: https://gist.github.com/oskar456/95c66d564c58361ecf9f
 
 
-class BH1750(Sensor):
+class Bh1750(Sensor):
 
     # Define some constants from the datasheet
     POWER_DOWN = 0x00  # No active state
@@ -35,8 +35,12 @@ class BH1750(Sensor):
 
     def __init__(self, *args, configuration):
         super().__init__(*args)
+
+        self.measurement_interval = configuration["intervals"]["measurementInterval"]
+        self.aggregate_interval = configuration["intervals"]["aggregateInterval"]
+
         address = int(configuration["i2cAddress"], base=16)
-        self.i2c_device = i2c.I2CDevice(address)
+        self.i2c_device = i2c.I2cDevice(address)
 
         self.set_sensitivity()
 

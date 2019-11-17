@@ -13,11 +13,15 @@ import trio
 from astroplant_kit.peripheral import Sensor
 
 
-class BME280(Sensor):
+class Bme280(Sensor):
     def __init__(self, *args, i2c_address, **kwargs):
         super().__init__(*args, **kwargs)
+
+        self.measurement_interval = configuration["intervals"]["measurementInterval"]
+        self.aggregate_interval = configuration["intervals"]["aggregateInterval"]
+
         address = int(i2c_address, base=16)
-        self.i2c_device = i2c.I2CDevice(address)
+        self.i2c_device = i2c.I2cDevice(address)
 
     async def measure(self):
         (temperature, pressure, humidity) = await self.readAll()

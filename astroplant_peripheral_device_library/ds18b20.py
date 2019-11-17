@@ -8,9 +8,12 @@ from astroplant_kit.peripheral import Sensor
 import w1thermsensor
 
 
-class W1ThermSensor(Sensor):
+class Ds18b20(Sensor):
     def __init__(self, *args, configuration):
         super().__init__(*args)
+
+        self.measurement_interval = configuration["intervals"]["measurementInterval"]
+        self.aggregate_interval = configuration["intervals"]["aggregateInterval"]
 
         sensor_type = (
             configuration["sensorType"] if "sensorType" in configuration else None

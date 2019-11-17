@@ -10,7 +10,7 @@ https://www.kernel.org/doc/Documentation/i2c/smbus-protocol
 SLEEP_TIME = 0.0001
 
 
-class I2CDevice(object):
+class I2cDevice(object):
     def __init__(self, address, bus=1):
         """
         Initialize the I2C device.
