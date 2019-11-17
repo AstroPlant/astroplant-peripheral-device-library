@@ -1,16 +1,17 @@
-import asyncio
-from astroplant_kit.peripheral import *
+import trio
+from astroplant_kit.peripheral import Sensor
 from . import i2c
 
 # Based on: https://gist.github.com/oskar456/95c66d564c58361ecf9f
 
+
 class BH1750(Sensor):
-    
+
     # Define some constants from the datasheet
-    POWER_DOWN = 0x00 # No active state
-    POWER_ON   = 0x01 # Power on
-    RESET      = 0x07 # Reset data register value
-     
+    POWER_DOWN = 0x00  # No active state
+    POWER_ON = 0x01  # Power on
+    RESET = 0x07  # Reset data register value
+
     # Start measurement at 4lx resolution. Time typically 16ms.
     CONTINUOUS_LOW_RES_MODE = 0x13
 
@@ -31,14 +32,14 @@ class BH1750(Sensor):
     # Start measurement at 1lx resolution. Time typically 120ms
     # Device is automatically set to Power Down after measurement.
     ONE_TIME_LOW_RES_MODE = 0x23
-    
-    def __init__(self, *args, i2c_address, **kwargs):
-        super().__init__(*args, **kwargs)
-        address = int(i2c_address, base=16)
+
+    def __init__(self, *args, configuration):
+        super().__init__(*args)
+        address = int(configuration["i2cAddress"], base=16)
         self.i2c_device = i2c.I2CDevice(address)
-        
+
         self.set_sensitivity()
-        
+
     def _set_mode(self, mode):
         self.mode = mode
         self.i2c_device.write_byte(self.mode)
@@ -50,7 +51,7 @@ class BH1750(Sensor):
         self._set_mode(self.POWER_ON)
 
     def reset(self):
-        self.power_on() #It has to be powered on before resetting
+        self.power_on()  # It has to be powered on before resetting
         self._set_mode(self.RESET)
 
     def cont_low_res(self):
@@ -84,25 +85,25 @@ class BH1750(Sensor):
             self.mtreg = sensitivity
         self.power_on()
         self._set_mode(0x40 | (self.mtreg >> 5))
-        self._set_mode(0x60 | (self.mtreg & 0x1f))
+        self._set_mode(0x60 | (self.mtreg & 0x1F))
         self.power_down()
 
     def get_result(self):
         """
         Return current measurement result in lux.
-        """   
+        """
         data = self.i2c_device.read_word_data(self.mode)
-        count = data >> 8 | (data&0xff)<<8
-        mode2coeff =  2 if (self.mode & 0x03) == 0x01 else 1
-        ratio = 1/(1.2 * (self.mtreg/69.0) * mode2coeff)
-        return ratio*count
+        count = data >> 8 | (data & 0xFF) << 8
+        mode2coeff = 2 if (self.mode & 0x03) == 0x01 else 1
+        ratio = 1 / (1.2 * (self.mtreg / 69.0) * mode2coeff)
+        return ratio * count
 
     async def wait_for_result(self, additional=0):
         basetime = 0.018 if (self.mode & 0x03) == 0x03 else 0.128
-        await asyncio.sleep(basetime * (self.mtreg/69.0) + additional)
+        await trio.sleep(basetime * (self.mtreg / 69.0) + additional)
 
     async def do_measurement(self, mode, additional_delay=0):
-        """ 
+        """
         Perform complete measurement using command
         specified by parameter mode with additional
         delay specified in parameter additional_delay.
@@ -125,7 +126,6 @@ class BH1750(Sensor):
     async def measure(self):
         light = await self.measure_high_res(additional_delay=0)
 
-        light_measurement = Measurement(self, "Light intensity", "Lux", light)
-        
-        return [light_measurement,]
-        
+        light_measurement = self.create_raw_measurement("Light intensity", "Lux", light)
+
+        return [light_measurement]

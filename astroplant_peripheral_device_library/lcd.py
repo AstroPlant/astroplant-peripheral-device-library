@@ -1,8 +1,7 @@
 import threading
 from time import sleep
 from . import i2c
-import asyncio
-from astroplant_kit.peripheral import *
+from astroplant_kit.peripheral import Display
 
 # I2C device constants
 ## Commands
@@ -48,19 +47,22 @@ LCD_5x10_DOTS = 0x04
 LCD_5x8_DOTS = 0x00
 
 ## Row offsets
-LCD_ROW_OFFSETS = [0x80, 0xC0, 0x94, 0xD4,]
+LCD_ROW_OFFSETS = [0x80, 0xC0, 0x94, 0xD4]
 
 ## RS/RW/EN bits
 REGISTER_SELECT = 0x01
 READ_WRITE = 0x02
 ENABLE = 0x04
 
+
 class LCD(Display):
+    def __init__(self, *args, configuration):
+        super().__init__(*args)
 
-    def __init__(self, *args, i2c_address = "0x27", **kwargs):
-        super().__init__(*args, **kwargs)
-
-        address = int(i2c_address, base=16)
+        if "i2cAddress" in configuration:
+            address = int(configuration["i2cAddress"], base=16)
+        else:
+            address = int("0x27", base=16)
 
         self.lines = []
         self.rows = 2
@@ -75,7 +77,9 @@ class LCD(Display):
         self.write_command(0x02)
 
         # Set LCD to 2 lines, 5*8 character size, and 4 bit mode
-        self.write_command(LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE)
+        self.write_command(
+            LCD_FUNCTION_SET | LCD_2_LINES | LCD_5x8_DOTS | LCD_4_BIT_MODE
+        )
 
         self.clear()
         self.turn_on()
@@ -83,9 +87,9 @@ class LCD(Display):
 
         # Set LCD entry mode to left entry
         self.write_command(LCD_ENTRY_MODE_SET | LCD_ENTRY_LEFT)
-        
+
         self.write_lock = threading.Lock()
-        
+
         # Start LCD updates.
         thread = threading.Thread(target=self._run)
         thread.daemon = True
@@ -111,7 +115,10 @@ class LCD(Display):
                     else:
                         NUM_STATIC_TICKS = 10
                         # We only require printing when the line is new or when we are scrolling.
-                        if (line.staticTicks == 0 or line.staticTicks >= NUM_STATIC_TICKS):
+                        if (
+                            line.staticTicks == 0
+                            or line.staticTicks >= NUM_STATIC_TICKS
+                        ):
                             # Line does not fit, scroll it continuously
 
                             # Get cursor position on screen, based on current index in the line
@@ -121,7 +128,7 @@ class LCD(Display):
                             line_length = self.columns - cursor_position
 
                             # Get the text to display
-                            text = line.str[line.idx-(line_length-1):line.idx+1]
+                            text = line.str[line.idx - (line_length - 1) : line.idx + 1]
                             prepend_spaces = " " * cursor_position
                             append_spaces = " " * (line_length - len(text))
 
@@ -132,9 +139,9 @@ class LCD(Display):
                             # Text is now empty, so we are at the end of the line. Reset back to start
                             if len(text) == 0:
                                 line.idx = 0
-                        
+
                         # Only scroll after the line has been displayed staticly for a while.
-                        if (line.staticTicks >= NUM_STATIC_TICKS):
+                        if line.staticTicks >= NUM_STATIC_TICKS:
                             line.idx += 1
                         else:
                             line.staticTicks += 1
@@ -155,7 +162,7 @@ class LCD(Display):
             data |= LCD_BACKLIGHT_ON
         else:
             data |= LCD_BACKLIGHT_OFF
-        
+
         self.i2c_device.write_byte(data | ENABLE)
         sleep(0.0005)
         self.i2c_device.write_byte(data & ~ENABLE)
@@ -207,10 +214,11 @@ class LCD(Display):
         else:
             self.i2c_device.write_cmd(LCD_BACKLIGHT_OFF)
 
+
 class LCDLine(object):
     def __init__(self, str):
         self.str = str
         self.len = len(str)
-        self.idx = 15 # Scrolling lines are displayed fully left-aligned at the start.
+        self.idx = 15  # Scrolling lines are displayed fully left-aligned at the start.
         self.staticTicks = 0
         self.written = False

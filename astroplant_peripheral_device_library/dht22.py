@@ -1,5 +1,5 @@
 """
-Based on: 
+Based on:
 https://github.com/joan2937/pigpio/blob/master/EXAMPLES/Python/DHT22_AM2302_SENSOR/DHT22.py
 """
 
@@ -8,11 +8,12 @@ import time
 import atexit
 import pigpio
 
-import asyncio
-from astroplant_kit.peripheral import *
+import trio
+from astroplant_kit.peripheral import Sensor
+
 
 class _DHT22:
-   """
+    """
    A class to read relative humidity and temperature from the
    DHT22 sensor.  The sensor is also known as the AM2302.
 
@@ -36,8 +37,8 @@ class _DHT22:
    gpio ------------+
    """
 
-   def __init__(self, pi, gpio, LED=None, power=None):
-      """
+    def __init__(self, pi, gpio, LED=None, power=None):
+        """
       Instantiate with the Pi and gpio to which the DHT22 output
       pin is connected.
 
@@ -52,223 +53,224 @@ class _DHT22:
       eventually cause the DHT22 to hang.  A 3 second interval seems OK.
       """
 
-      self.pi = pi
-      self.gpio = gpio
-      self.LED = LED
-      self.power = power
+        self.pi = pi
+        self.gpio = gpio
+        self.LED = LED
+        self.power = power
 
-      if power is not None:
-         pi.write(power, 1)  # Switch sensor on.
-         time.sleep(2)
+        if power is not None:
+            pi.write(power, 1)  # Switch sensor on.
+            time.sleep(2)
 
-      self.powered = True
+        self.powered = True
 
-      self.cb = None
+        self.cb = None
 
-      atexit.register(self.cancel)
+        atexit.register(self.cancel)
 
-      self.suc_M = 0   # Successful message count.
-      self.bad_CS = 0  # Bad checksum count.
-      self.bad_SM = 0  # Short message count.
-      self.bad_MM = 0  # Missing message count.
-      self.bad_SR = 0  # Sensor reset count.
+        self.suc_M = 0  # Successful message count.
+        self.bad_CS = 0  # Bad checksum count.
+        self.bad_SM = 0  # Short message count.
+        self.bad_MM = 0  # Missing message count.
+        self.bad_SR = 0  # Sensor reset count.
 
-      # Power cycle if timeout > MAX_TIMEOUTS.
-      self.no_response = 0
-      self.MAX_NO_RESPONSE = 2
+        # Power cycle if timeout > MAX_TIMEOUTS.
+        self.no_response = 0
+        self.MAX_NO_RESPONSE = 2
 
-      self.rhum = -999
-      self.temp = -999
+        self.rhum = -999
+        self.temp = -999
 
-      self.tov = None
+        self.tov = None
 
-      self.high_tick = 0
-      self.bit = 40
+        self.high_tick = 0
+        self.bit = 40
 
-      pi.set_pull_up_down(gpio, pigpio.PUD_OFF)
+        pi.set_pull_up_down(gpio, pigpio.PUD_OFF)
 
-      pi.set_watchdog(gpio, 0)  # Kill any watchdogs.
+        pi.set_watchdog(gpio, 0)  # Kill any watchdogs.
 
-      self.cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
+        self.cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cb)
 
-   def _cb(self, gpio, level, tick):
-      """
+    def _cb(self, gpio, level, tick):
+        """
       Accumulate the 40 data bits.  Format into 5 bytes, humidity high,
       humidity low, temperature high, temperature low, checksum.
       """
-      diff = pigpio.tickDiff(self.high_tick, tick)
+        diff = pigpio.tickDiff(self.high_tick, tick)
 
-      if level == 0:
+        if level == 0:
 
-         # Edge length determines if bit is 1 or 0.
+            # Edge length determines if bit is 1 or 0.
 
-         if diff >= 50:
-            val = 1
-            if diff >= 200:   # Bad bit?
-               self.CS = 256  # Force bad checksum.
-         else:
-            val = 0
+            if diff >= 50:
+                val = 1
+                if diff >= 200:  # Bad bit?
+                    self.CS = 256  # Force bad checksum.
+            else:
+                val = 0
 
-         if self.bit >= 40:  # Message complete.
-            self.bit = 40
+            if self.bit >= 40:  # Message complete.
+                self.bit = 40
 
-         elif self.bit >= 32:  # In checksum byte.
-            self.CS  = (self.CS << 1)  + val
+            elif self.bit >= 32:  # In checksum byte.
+                self.CS = (self.CS << 1) + val
 
-            if self.bit == 39:
+                if self.bit == 39:
 
-               # 40th bit received.
+                    # 40th bit received.
 
-               self.pi.set_watchdog(self.gpio, 0)
+                    self.pi.set_watchdog(self.gpio, 0)
 
-               self.no_response = 0
+                    self.no_response = 0
 
-               total = self.hH + self.hL + self.tH + self.tL
+                    total = self.hH + self.hL + self.tH + self.tL
 
-               if (total & 255) == self.CS:  # Is checksum ok?
+                    if (total & 255) == self.CS:  # Is checksum ok?
 
-                  self.rhum = ((self.hH << 8) + self.hL) * 0.1
+                        self.rhum = ((self.hH << 8) + self.hL) * 0.1
 
-                  if self.tH & 128:  # Negative temperature.
-                     mult = -0.1
-                     self.tH = self.tH & 127
-                  else:
-                     mult = 0.1
+                        if self.tH & 128:  # Negative temperature.
+                            mult = -0.1
+                            self.tH = self.tH & 127
+                        else:
+                            mult = 0.1
 
-                  self.temp = ((self.tH << 8) + self.tL) * mult
+                        self.temp = ((self.tH << 8) + self.tL) * mult
 
-                  self.tov = time.time()
+                        self.tov = time.time()
 
-                  self.suc_M += 1
-                  if self.LED is not None:
-                     self.pi.write(self.LED, 0)
+                        self.suc_M += 1
+                        if self.LED is not None:
+                            self.pi.write(self.LED, 0)
 
-               else:
+                    else:
 
-                  self.bad_CS += 1
+                        self.bad_CS += 1
 
-         elif self.bit >= 24:  # in temp low byte
-            self.tL = (self.tL << 1) + val
+            elif self.bit >= 24:  # in temp low byte
+                self.tL = (self.tL << 1) + val
 
-         elif self.bit >= 16:  # in temp high byte
-            self.tH = (self.tH << 1) + val
+            elif self.bit >= 16:  # in temp high byte
+                self.tH = (self.tH << 1) + val
 
-         elif self.bit >= 8:  # in humidity low byte
-            self.hL = (self.hL << 1) + val
+            elif self.bit >= 8:  # in humidity low byte
+                self.hL = (self.hL << 1) + val
 
-         elif self.bit >= 0:  # in humidity high byte
-            self.hH = (self.hH << 1) + val
+            elif self.bit >= 0:  # in humidity high byte
+                self.hH = (self.hH << 1) + val
 
-         else:               # header bits
-            pass
+            else:  # header bits
+                pass
 
-         self.bit += 1
+            self.bit += 1
 
-      elif level == 1:
-         self.high_tick = tick
-         if diff > 250000:
-            self.bit = -2
-            self.hH = 0
-            self.hL = 0
-            self.tH = 0
-            self.tL = 0
-            self.CS = 0
+        elif level == 1:
+            self.high_tick = tick
+            if diff > 250000:
+                self.bit = -2
+                self.hH = 0
+                self.hL = 0
+                self.tH = 0
+                self.tL = 0
+                self.CS = 0
 
-      else:  # level == pigpio.TIMEOUT:
-         self.pi.set_watchdog(self.gpio, 0)
-         if self.bit < 8:       # Too few data bits received.
-            self.bad_MM += 1    # Bump missing message count.
-            self.no_response += 1
-            if self.no_response > self.MAX_NO_RESPONSE:
-               self.no_response = 0
-               self.bad_SR += 1  # Bump sensor reset count.
-               if self.power is not None:
-                  self.powered = False
-                  self.pi.write(self.power, 0)
-                  time.sleep(2)
-                  self.pi.write(self.power, 1)
-                  time.sleep(2)
-                  self.powered = True
-         elif self.bit < 39:    # Short message receieved.
-            self.bad_SM += 1    # Bump short message count.
-            self.no_response = 0
+        else:  # level == pigpio.TIMEOUT:
+            self.pi.set_watchdog(self.gpio, 0)
+            if self.bit < 8:  # Too few data bits received.
+                self.bad_MM += 1  # Bump missing message count.
+                self.no_response += 1
+                if self.no_response > self.MAX_NO_RESPONSE:
+                    self.no_response = 0
+                    self.bad_SR += 1  # Bump sensor reset count.
+                    if self.power is not None:
+                        self.powered = False
+                        self.pi.write(self.power, 0)
+                        time.sleep(2)
+                        self.pi.write(self.power, 1)
+                        time.sleep(2)
+                        self.powered = True
+            elif self.bit < 39:  # Short message receieved.
+                self.bad_SM += 1  # Bump short message count.
+                self.no_response = 0
 
-         else:                  # Full message received.
-            self.no_response = 0
+            else:  # Full message received.
+                self.no_response = 0
 
-   def temperature(self):
-      """Return current temperature."""
-      return self.temp
+    def temperature(self):
+        """Return current temperature."""
+        return self.temp
 
-   def humidity(self):
-      """Return current relative humidity."""
-      return self.rhum
+    def humidity(self):
+        """Return current relative humidity."""
+        return self.rhum
 
-   def successful_message(self):
-      """Return the count of successful messages."""
-      return self.suc_M
-      
-   def staleness(self):
-      """Return time since measurement made."""
-      if self.tov is not None:
-         return time.time() - self.tov
-      else:
-         return -999
+    def successful_message(self):
+        """Return the count of successful messages."""
+        return self.suc_M
 
-   def bad_checksum(self):
-      """Return count of messages received with bad checksums."""
-      return self.bad_CS
+    def staleness(self):
+        """Return time since measurement made."""
+        if self.tov is not None:
+            return time.time() - self.tov
+        else:
+            return -999
 
-   def short_message(self):
-      """Return count of short messages."""
-      return self.bad_SM
+    def bad_checksum(self):
+        """Return count of messages received with bad checksums."""
+        return self.bad_CS
 
-   def missing_message(self):
-      """Return count of missing messages."""
-      return self.bad_MM
+    def short_message(self):
+        """Return count of short messages."""
+        return self.bad_SM
 
-   def sensor_resets(self):
-      """Return count of power cycles because of sensor hangs."""
-      return self.bad_SR
+    def missing_message(self):
+        """Return count of missing messages."""
+        return self.bad_MM
 
-   def trigger(self):
-      """Trigger a new relative humidity and temperature reading."""
-      if self.powered:
-         if self.LED is not None:
-            self.pi.write(self.LED, 1)
+    def sensor_resets(self):
+        """Return count of power cycles because of sensor hangs."""
+        return self.bad_SR
 
-         self.pi.write(self.gpio, pigpio.LOW)
-         time.sleep(0.017)  # 17 ms
-         self.pi.set_mode(self.gpio, pigpio.INPUT)
-         self.pi.set_watchdog(self.gpio, 200)
+    def trigger(self):
+        """Trigger a new relative humidity and temperature reading."""
+        if self.powered:
+            if self.LED is not None:
+                self.pi.write(self.LED, 1)
 
-   def cancel(self):
-      """Cancel the DHT22 sensor."""
+            self.pi.write(self.gpio, pigpio.LOW)
+            time.sleep(0.017)  # 17 ms
+            self.pi.set_mode(self.gpio, pigpio.INPUT)
+            self.pi.set_watchdog(self.gpio, 200)
 
-      self.pi.set_watchdog(self.gpio, 0)
+    def cancel(self):
+        """Cancel the DHT22 sensor."""
 
-      if self.cb is not None:
-         self.cb.cancel()
-         self.cb = None
+        self.pi.set_watchdog(self.gpio, 0)
+
+        if self.cb is not None:
+            self.cb.cancel()
+            self.cb = None
+
 
 class DHT22(Sensor):
     SLEEP_BETWEEN_MEASUREMENTS = 3.5
 
-    def __init__(self, *args, pin, **kwargs):
-        super().__init__(*args, **kwargs)
-    
-        self.pin = int(pin)
+    def __init__(self, *args, configuration):
+        super().__init__(*args)
+
+        self.pin = configuration["gpioAddress"]
         self.dht22 = _DHT22(pigpio.pi(), self.pin)
 
     async def measure(self):
         successful_message_count_before = self.dht22.successful_message()
-        
+
         # Trigger a new reading in a separate thread (timing is important for the DHT22)
         thread = threading.Thread(target=self.dht22.trigger)
         thread.daemon = True
         thread.start()
-        await asyncio.sleep(2.0)
-        
+        await trio.sleep(2.0)
+
         # See if there has been a new successful reading
         # TODO: we have a mild race condition here... we should use a lock
         # that is acquired here, as well as in DHT22._cb in the "# Is
@@ -276,12 +278,15 @@ class DHT22(Sensor):
         if self.dht22.successful_message() > successful_message_count_before:
             temperature = self.dht22.temperature()
             humidity = self.dht22.humidity()
-            
-            temperature_measurement = Measurement(self, "Temperature", "Degrees Celsius", temperature)
-            humidity_measurement = Measurement(self, "Humidity", "Percent", humidity)
-            
-            return [temperature_measurement, humidity_measurement,]
+
+            temperature_measurement = self.create_raw_measurement(
+                "Temperature", "Degrees Celsius", temperature
+            )
+            humidity_measurement = self.create_raw_measurement(
+                "Humidity", "Percent", humidity
+            )
+
+            return [temperature_measurement, humidity_measurement]
         else:
             # No valid measurement was made
             return []
-
