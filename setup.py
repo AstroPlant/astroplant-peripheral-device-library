@@ -1,9 +1,17 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+import astroplant_peripheral_device_library
+try:
+    from setuptools import setup
+except:
+    from distutils.core import setup
+
+
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 setup(name='astroplant-peripheral-device-library',
-      version='0.1',
+      version=astroplant_peripheral_device_library.__version__,
       description='AstroPlant peripheral device library',
       author='AstroPlant',
       author_email='thomas@kepow.org',
