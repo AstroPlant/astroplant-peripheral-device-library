@@ -17,5 +17,6 @@ setup(name='astroplant-peripheral-device-library',
       author_email='thomas@kepow.org',
       url='https://astroplant.io',
       packages=['astroplant_peripheral_device_library',],
+      install_requires=requirements,
      )
 
