@@ -2,3 +2,5 @@ pyserial==3.4
 rpi.gpio==0.6.3
 w1thermsensor==1.0.5
 pigpio==1.44
+picamera~=1.13
+numpy~=1.15
