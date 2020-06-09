@@ -1,3 +1,13 @@
+"""
+Implements the Raspberry Pi V2 camera.
+
+For lighting-controlled pictures (Command.{REGULAR, NIR, NDVI}), this
+implementation assumes availability of exactly one
+astroplant_peripheral_device_library.led_panel.LedPanel. To take pictures, it
+temporarily assumes exclusive control of the LED panel and sets lighting as
+needed.
+"""
+
 import logging
 import threading
 import io
