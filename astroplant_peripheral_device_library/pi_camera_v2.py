@@ -17,10 +17,11 @@ import atexit
 import pigpio
 import picamera
 import numpy as np
+import schedule
 from PIL import Image
 from fractions import Fraction
 
-from astroplant_kit.peripheral import Peripheral, PeripheralCommandResult
+from astroplant_kit.peripheral import Data, Peripheral, PeripheralCommandResult
 
 from .led_panel import LedPanel
 from typing import Iterable
@@ -135,17 +136,44 @@ async def _capture_ndvi(camera: picamera.PiCamera, led_panel_control) -> bytes:
 
 class PiCameraV2(Peripheral):
     COMMANDS = True
+    RUNNABLE = True
 
     def __init__(self, *args, configuration):
         super().__init__(*args)
 
-        configuration = {"camera": "piCameraV2"}
+        self._nursery = None
+
         if configuration["camera"] == "piCameraV2":
             self.camera = picamera.PiCamera(resolution=(1640, 1232), sensor_mode=3)
         else:
             raise UnknownCamera()
 
-    async def _do(self, command: Command):
+        self._scheduler = schedule.Scheduler()
+        for task in configuration["schedule"]:
+            self._scheduler.every().day.at(task["time"]).do(
+                self._spawn_command, task["command"]
+            )
+
+    def _spawn_command(self, command):
+        self._nursery.start_soon(self._handle_command_with_control, command)
+
+    async def _handle_command_with_control(self, command):
+        logger.debug(f"Spawning {command}")
+        cmd = Command.UNCONTROLLED
+        if command == "uncontrolled":
+            cmd = Command.UNCONTROLLED
+        elif command == "regular":
+            cmd = Command.REGULAR
+        elif command == "nir":
+            cmd = Command.NIR
+        elif command == "ndvi":
+            cmd = Command.NDVI
+
+        # Block until nothing can call `do` anymore.
+        async with self.manager.control(self):
+            return await self._handle_command(cmd)
+
+    async def _handle_command(self, command: Command):
         led_control_required = command in [Command.REGULAR, Command.NDVI, Command.NIR]
         led_panel_control = None
         if led_control_required:
@@ -165,32 +193,41 @@ class PiCameraV2(Peripheral):
 
                 if command is Command.REGULAR:
                     result = await _capture_regular(self.camera, control)
+                    file_name = "regular.png"
                 elif command is Command.NIR:
                     result = await _capture_nir(self.camera, control)
+                    file_name = "nir.png"
                 elif command is Command.NDVI:
                     result = await _capture_ndvi(self.camera, control)
+                    file_name = "ndvi.png"
 
-                return PeripheralCommandResult(
-                    media_type="image/png", data=result, metadata=None
-                )
+                media = self.create_media(file_name, "image/png", result, None)
         else:
             if command is Command.UNCONTROLLED:
                 result = await _capture_uncontrolled(self.camera)
+                file_name = "uncontrolled.png"
 
-            return PeripheralCommandResult(
-                media_type="image/png", data=result, metadata=None
-            )
+            media = self.create_media(file_name, "image/png", result, None)
+
+        if media is not None:
+            await self._publish_data(Data(media))
+            return media
+
+    async def run(self):
+        async with trio.open_nursery() as nursery:
+            while True:
+                self._nursery = nursery
+                await trio.sleep(self._scheduler.idle_seconds)
+                self._scheduler.run_pending()
 
     async def do(self, command):
         logger.debug(f"received command {command}")
         if command == "uncontrolled":
-            return await self._do(Command.UNCONTROLLED)
+            media = await self._handle_command(Command.UNCONTROLLED)
         elif command == "regular":
-            return await self._do(Command.REGULAR)
+            media = await self._handle_command(Command.REGULAR)
         elif command == "nir":
-            return await self._do(Command.NIR)
+            media = await self._handle_command(Command.NIR)
         elif command == "ndvi":
-            return await self._do(Command.NDVI)
-
-    # async def run(self):
-    #     await trio.sleep(2.0)
+            media = await self._handle_command(Command.NDVI)
+        return PeripheralCommandResult(media=media)

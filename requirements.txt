@@ -4,3 +4,4 @@ w1thermsensor==1.0.5
 pigpio==1.44
 picamera~=1.13
 numpy~=1.15
+schedule~=0.6
