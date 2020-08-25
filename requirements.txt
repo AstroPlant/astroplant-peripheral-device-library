@@ -3,5 +3,6 @@ rpi.gpio==0.6.3
 w1thermsensor==1.0.5
 pigpio==1.44
 picamera~=1.13
+pillow~=7.2
 numpy~=1.15
 schedule~=0.6
