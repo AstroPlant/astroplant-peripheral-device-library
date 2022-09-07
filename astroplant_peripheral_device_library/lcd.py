@@ -1,7 +1,10 @@
 import threading
 from time import sleep
-from . import i2c
+
+import trio
 from astroplant_kit.peripheral import Display
+
+from . import i2c
 
 # I2C device constants
 ## Commands
@@ -64,12 +67,15 @@ class LCD(Display):
         else:
             address = int("0x27", base=16)
 
+        self._stop = threading.Event()
+
         self.lines = []
         self.rows = 2
         self.columns = 16
 
         self.i2c_device = i2c.I2cDevice(address)
 
+    async def set_up(self):
         # Initialize
         self.write_command(0x03)
         self.write_command(0x03)
@@ -91,9 +97,16 @@ class LCD(Display):
         self.write_lock = threading.Lock()
 
         # Start LCD updates.
-        thread = threading.Thread(target=self._run)
-        thread.daemon = True
-        thread.start()
+        self.thread = threading.Thread(target=self._run)
+        self.thread.daemon = True
+        self.thread.start()
+
+    async def clean_up(self):
+        if self.thread:
+            self._stop.set()
+            await trio.to_thread.run_sync(self.thread.join)
+
+        self.i2c_device.stop()
 
     def display(self, str):
         with self.write_lock:
@@ -102,6 +115,9 @@ class LCD(Display):
 
     def _run(self):
         while True:
+            if self._stop.is_set():
+                return
+
             with self.write_lock:
                 for row in range(min(self.rows, len(self.lines))):
                     line = self.lines[row]
