@@ -1,5 +1,10 @@
 import trio
-from astroplant_kit.peripheral import Sensor
+from astroplant_kit.peripheral import (
+    FatalPeripheralError,
+    Sensor,
+    TemporaryPeripheralError,
+)
+
 from . import i2c
 
 # Based on: https://gist.github.com/oskar456/95c66d564c58361ecf9f
@@ -43,7 +48,10 @@ class Bh1750(Sensor):
         self.i2c_device = i2c.I2cDevice(address)
 
     async def set_up(self):
-        self.set_sensitivity()
+        try:
+            self.set_sensitivity()
+        except Exception as e:
+            raise FatalPeripheralError("could not perform sensor setup (BH1750)") from e
 
     async def clean_up(self):
         self.i2c_device.stop()
@@ -132,7 +140,10 @@ class Bh1750(Sensor):
         return self.do_measurement(self.ONE_TIME_HIGH_RES_MODE_2, additional_delay)
 
     async def measure(self):
-        light = await self.measure_high_res(additional_delay=0)
+        try:
+            light = await self.measure_high_res(additional_delay=0)
+        except Exception as e:
+            raise TemporaryPeripheralError("could not read from sensor (BH1750)") from e
 
         light_measurement = self.create_raw_measurement("Light intensity", "Lux", light)
 
