@@ -273,15 +273,12 @@ class Dht22(Sensor):
         successful_message_count_before = self.dht22.successful_message()
 
         # Trigger a new reading in a separate thread (timing is important for the DHT22)
-        thread = threading.Thread(target=self.dht22.trigger)
-        thread.daemon = True
-        thread.start()
-        await trio.sleep(2.0)
+        try:
+            await trio.to_thread.run_sync(self.dht22.trigger)
+        except Exception as e:
+            raise TemporaryPeripheralError("failed to read from sensor (DHT22)") from e
 
         # See if there has been a new successful reading
-        # TODO: we have a mild race condition here... we should use a lock
-        # that is acquired here, as well as in DHT22._cb in the "# Is
-        # checksum ok?"- block.
         if self.dht22.successful_message() > successful_message_count_before:
             temperature = self.dht22.temperature()
             humidity = self.dht22.humidity()
