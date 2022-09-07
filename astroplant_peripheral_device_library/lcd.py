@@ -162,7 +162,7 @@ class LCD(Display):
                         else:
                             line.staticTicks += 1
 
-            sleep(0.15)
+            sleep(0.3)
 
     def _write_str(self, str):
         for char in str:
