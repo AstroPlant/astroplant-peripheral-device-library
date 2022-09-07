@@ -14,44 +14,44 @@ from astroplant_kit.peripheral import Sensor
 
 class _DHT22:
     """
-   A class to read relative humidity and temperature from the
-   DHT22 sensor.  The sensor is also known as the AM2302.
+    A class to read relative humidity and temperature from the
+    DHT22 sensor.  The sensor is also known as the AM2302.
 
-   The sensor can be powered from the Pi 3V3 or the Pi 5V rail.
+    The sensor can be powered from the Pi 3V3 or the Pi 5V rail.
 
-   Powering from the 3V3 rail is simpler and safer.  You may need
-   to power from 5V if the sensor is connected via a long cable.
+    Powering from the 3V3 rail is simpler and safer.  You may need
+    to power from 5V if the sensor is connected via a long cable.
 
-   For 3V3 operation connect pin 1 to 3V3 and pin 4 to ground.
+    For 3V3 operation connect pin 1 to 3V3 and pin 4 to ground.
 
-   Connect pin 2 to a gpio.
+    Connect pin 2 to a gpio.
 
-   For 5V operation connect pin 1 to 5V and pin 4 to ground.
+    For 5V operation connect pin 1 to 5V and pin 4 to ground.
 
-   The following pin 2 connection works for me.  Use at YOUR OWN RISK.
+    The following pin 2 connection works for me.  Use at YOUR OWN RISK.
 
-   5V--5K_resistor--+--10K_resistor--Ground
-                    |
-   DHT22 pin 2 -----+
-                    |
-   gpio ------------+
-   """
+    5V--5K_resistor--+--10K_resistor--Ground
+                     |
+    DHT22 pin 2 -----+
+                     |
+    gpio ------------+
+    """
 
     def __init__(self, pi, gpio, LED=None, power=None):
         """
-      Instantiate with the Pi and gpio to which the DHT22 output
-      pin is connected.
+        Instantiate with the Pi and gpio to which the DHT22 output
+        pin is connected.
 
-      Optionally a LED may be specified.  This will be blinked for
-      each successful reading.
+        Optionally a LED may be specified.  This will be blinked for
+        each successful reading.
 
-      Optionally a gpio used to power the sensor may be specified.
-      This gpio will be set high to power the sensor.  If the sensor
-      locks it will be power cycled to restart the readings.
+        Optionally a gpio used to power the sensor may be specified.
+        This gpio will be set high to power the sensor.  If the sensor
+        locks it will be power cycled to restart the readings.
 
-      Taking readings more often than about once every two seconds will
-      eventually cause the DHT22 to hang.  A 3 second interval seems OK.
-      """
+        Taking readings more often than about once every two seconds will
+        eventually cause the DHT22 to hang.  A 3 second interval seems OK.
+        """
 
         self.pi = pi
         self.gpio = gpio
@@ -94,9 +94,9 @@ class _DHT22:
 
     def _cb(self, gpio, level, tick):
         """
-      Accumulate the 40 data bits.  Format into 5 bytes, humidity high,
-      humidity low, temperature high, temperature low, checksum.
-      """
+        Accumulate the 40 data bits.  Format into 5 bytes, humidity high,
+        humidity low, temperature high, temperature low, checksum.
+        """
         diff = pigpio.tickDiff(self.high_tick, tick)
 
         if level == 0:
