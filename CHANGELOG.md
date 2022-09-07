@@ -2,7 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.0.0b7] - 2022-09-08
+
+### Changed
+
+- Target Raspbian OS Bullseye
+- As Bullseye is now targeted, move from legacy camera stack to libcamera using picamera2
+
+### Fix
+
+- LCD: improve exception handling
 
 ### Added
 
