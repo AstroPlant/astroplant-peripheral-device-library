@@ -2,7 +2,11 @@ import threading
 from time import sleep
 
 import trio
-from astroplant_kit.peripheral import Display, FatalPeripheralError
+from astroplant_kit.peripheral import (
+    Display,
+    FatalPeripheralError,
+    TemporaryPeripheralError,
+)
 
 from . import i2c
 
@@ -67,8 +71,6 @@ class LCD(Display):
         else:
             address = int("0x27", base=16)
 
-        self._stop = threading.Event()
-
         self.lines = []
         self.rows = 2
         self.columns = 16
@@ -97,6 +99,7 @@ class LCD(Display):
         except Exception as e:
             raise FatalPeripheralError("failed to set up LCD") from e
 
+        self._stop = threading.Event()
         self.write_lock = threading.Lock()
 
         # Start LCD updates.
@@ -108,62 +111,78 @@ class LCD(Display):
         if self.thread:
             self._stop.set()
             await trio.to_thread.run_sync(self.thread.join)
-
         self.i2c_device.stop()
 
     def display(self, str):
         with self.write_lock:
             self.lines = [LCDLine(str) for str in str.splitlines()]
-            self.clear()
 
     def _run(self):
-        while True:
-            if self._stop.is_set():
-                return
+        lines = []
 
+        while not self._stop.is_set():
+            lines_changed = False
             with self.write_lock:
-                for row in range(min(self.rows, len(self.lines))):
-                    line = self.lines[row]
+                if lines != self.lines:
+                    lines_changed = True
+                lines = self.lines.copy()
 
-                    if line.len <= self.columns:
-                        # Line fits fully
-                        if not line.written:
+            if lines_changed:
+                try:
+                    self.clear()
+                except Exception as e:
+                    raise TemporaryPeripheralError("failed to write to LCD") from e
+
+            for row in range(min(self.rows, len(lines))):
+                line = lines[row]
+
+                if line.len <= self.columns:
+                    # Line fits fully
+                    if not line.written:
+                        try:
                             self.set_cursor_position(row, 0)
                             self._write_str(line.str)
-                            line.written = True
-                    else:
-                        NUM_STATIC_TICKS = 10
-                        # We only require printing when the line is new or when we are scrolling.
-                        if (
-                            line.staticTicks == 0
-                            or line.staticTicks >= NUM_STATIC_TICKS
-                        ):
-                            # Line does not fit, scroll it continuously
+                        except Exception as e:
+                            raise TemporaryPeripheralError(
+                                "failed to write to LCD"
+                            ) from e
 
-                            # Get cursor position on screen, based on current index in the line
-                            cursor_position = max(self.columns - line.idx - 1, 0)
+                        line.written = True
+                else:
+                    NUM_STATIC_TICKS = 10
+                    # We only require printing when the line is new or when we are scrolling.
+                    if line.staticTicks == 0 or line.staticTicks >= NUM_STATIC_TICKS:
+                        # Line does not fit, scroll it continuously
 
-                            # Get the length of the line we can print on
-                            line_length = self.columns - cursor_position
+                        # Get cursor position on screen, based on current index in the line
+                        cursor_position = max(self.columns - line.idx - 1, 0)
 
-                            # Get the text to display
-                            text = line.str[line.idx - (line_length - 1) : line.idx + 1]
-                            prepend_spaces = " " * cursor_position
-                            append_spaces = " " * (line_length - len(text))
+                        # Get the length of the line we can print on
+                        line_length = self.columns - cursor_position
 
-                            # Set the cursor position and display
+                        # Get the text to display
+                        text = line.str[line.idx - (line_length - 1) : line.idx + 1]
+                        prepend_spaces = " " * cursor_position
+                        append_spaces = " " * (line_length - len(text))
+
+                        # Set the cursor position and display
+                        try:
                             self.set_cursor_position(row, 0)
                             self._write_str(prepend_spaces + text + append_spaces)
+                        except Exception as e:
+                            raise TemporaryPeripheralError(
+                                "failed to write to LCD"
+                            ) from e
 
-                            # Text is now empty, so we are at the end of the line. Reset back to start
-                            if len(text) == 0:
-                                line.idx = 0
+                        # Text is now empty, so we are at the end of the line. Reset back to start
+                        if len(text) == 0:
+                            line.idx = 0
 
-                        # Only scroll after the line has been displayed staticly for a while.
-                        if line.staticTicks >= NUM_STATIC_TICKS:
-                            line.idx += 1
-                        else:
-                            line.staticTicks += 1
+                    # Only scroll after the line has been displayed staticly for a while.
+                    if line.staticTicks >= NUM_STATIC_TICKS:
+                        line.idx += 1
+                    else:
+                        line.staticTicks += 1
 
             sleep(0.3)
 
