@@ -8,24 +8,18 @@ temporarily assumes exclusive control of the LED panel and sets lighting as
 needed.
 """
 
-import logging
-import threading
 import io
-import trio
-import time
-import atexit
-import pigpio
-import picamera
-import numpy as np
-import schedule
-from PIL import Image
-from fractions import Fraction
-
-from astroplant_kit.peripheral import Data, Peripheral, PeripheralCommandResult
-
-from .led_panel import LedPanel
+import logging
 from typing import Iterable
 
+import numpy as np
+import picamera2
+import schedule
+import trio
+from astroplant_kit.peripheral import Data, Peripheral, PeripheralCommandResult
+from PIL import Image
+
+from .led_panel import LedPanel
 
 logger = logging.getLogger("astroplant_peripheral_device_library.pi_camera_v2")
 
@@ -55,28 +49,28 @@ def _find_led_panel(peripherals: Iterable[Peripheral]):
             return peripheral
 
 
-def _capture(camera: picamera.PiCamera) -> bytes:
+def _capture(camera: picamera2.Picamera2) -> bytes:
     """
     Capture an image to png.
     """
     bytes_stream = io.BytesIO()
-    camera.capture(bytes_stream, "png")
+    camera.capture_file(bytes_stream, format="png")
     bytes_stream.seek(0)
     return bytes_stream.read()
 
 
-async def _capture_uncontrolled(camera: picamera.PiCamera) -> bytes:
+async def _capture_uncontrolled(camera: picamera2.Picamera2) -> bytes:
     await trio.sleep(2)
     return await trio.to_thread.run_sync(_capture, camera)
 
 
-async def _capture_regular(camera: picamera.PiCamera, led_panel_control) -> bytes:
+async def _capture_regular(camera: picamera2.Picamera2, led_panel_control) -> bytes:
     await led_panel_control({"blue": 75, "red": 75, "farRed": 0})
     await trio.sleep(4)
     return await trio.to_thread.run_sync(_capture, camera)
 
 
-def _capture_np_unencoded(camera: picamera.PiCamera, resolution, format="rgb"):
+def _capture_np_unencoded(camera: picamera2.Picamera2, resolution, format="rgb"):
     # Camera rounds up to nearest 32 horizontal pixels, and nearest 16 vertical.
     (x, y) = resolution
     x_orig = x
@@ -86,12 +80,12 @@ def _capture_np_unencoded(camera: picamera.PiCamera, resolution, format="rgb"):
     if y % 16 != 0:
         y += 16 - y % 16
     buffer = np.empty((y * x * 3,), dtype=np.uint8)
-    camera.capture(buffer, format)
+    camera.capture_file(buffer, format=format)
     buffer = buffer.reshape((y, x, 3))
     return buffer[:y_orig, :x_orig, :]
 
 
-async def _capture_nir(camera: picamera.PiCamera, led_panel_control) -> bytes:
+async def _capture_nir(camera: picamera2.Picamera2, led_panel_control) -> bytes:
     await led_panel_control({"blue": 0, "red": 0, "farRed": 75})
     await trio.sleep(4)
     nir_rgb = await trio.to_thread.run_sync(_capture_np_unencoded, camera, (1640, 1232))
@@ -103,7 +97,7 @@ async def _capture_nir(camera: picamera.PiCamera, led_panel_control) -> bytes:
     return bytes_stream.read()
 
 
-async def _capture_ndvi(camera: picamera.PiCamera, led_panel_control) -> bytes:
+async def _capture_ndvi(camera: picamera2.Picamera2, led_panel_control) -> bytes:
     def process(red_rgb, nir_rgb) -> bytes:
         red_r = (red_rgb[:, :, 0]).astype(np.float)
         del red_rgb
@@ -144,15 +138,25 @@ class PiCameraV2(Peripheral):
         self._nursery = None
 
         if configuration["camera"] == "piCameraV2":
-            self.camera = picamera.PiCamera(resolution=(1640, 1232), sensor_mode=3)
+            self.camera = picamera2.Picamera2()
+            config = self.camera.create_still_configuration(main={"size": (1640, 1232)})
+            self.camera.configure(config)
         else:
             raise UnknownCamera()
 
+        self.schedule = configuration["schedule"]
+
+    async def set_up(self):
+        self.camera.start()
+
         self._scheduler = schedule.Scheduler()
-        for task in configuration["schedule"]:
+        for task in self.schedule:
             self._scheduler.every().day.at(task["time"]).do(
                 self._spawn_command, task["command"]
             )
+
+    async def clean_up(self):
+        self.camera.stop()
 
     def _spawn_command(self, command):
         self._nursery.start_soon(self._handle_command_with_control, command)

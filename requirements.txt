@@ -2,7 +2,6 @@ pyserial~=3.5
 rpi.gpio~=0.7.0
 w1thermsensor==1.0.5
 pigpio~=1.78
-picamera~=1.13
 pillow~=7.2
 numpy~=1.19.5
 schedule~=0.6
