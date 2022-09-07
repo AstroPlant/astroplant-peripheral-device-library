@@ -17,7 +17,7 @@ class MhZ19(Sensor):
             else "/dev/ttyS0"
         )
         self.serial = serial.Serial(
-            "/dev/ttyS0",
+            file_name,
             baudrate=9600,
             bytesize=serial.EIGHTBITS,
             parity=serial.PARITY_NONE,
