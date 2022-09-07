@@ -25,6 +25,12 @@ class I2cDevice(object):
         # Open I2C handle
         self.handle = self.pi.i2c_open(self.bus, self.address)
 
+    def stop(self):
+        """
+        Release resources.
+        """
+        self.pi.stop()
+
     def read_byte(self):
         """
         Read a byte from the I2C device.
