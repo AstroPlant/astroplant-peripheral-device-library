@@ -3,13 +3,11 @@ Based on:
 https://github.com/joan2937/pigpio/blob/master/EXAMPLES/Python/DHT22_AM2302_SENSOR/DHT22.py
 """
 
-import threading
 import time
-import atexit
-import pigpio
 
+import pigpio
 import trio
-from astroplant_kit.peripheral import Sensor
+from astroplant_kit.peripheral import Sensor, TemporaryPeripheralError
 
 
 class _DHT22:
@@ -65,8 +63,6 @@ class _DHT22:
         self.powered = True
 
         self.cb = None
-
-        atexit.register(self.cancel)
 
         self.suc_M = 0  # Successful message count.
         self.bad_CS = 0  # Bad checksum count.
@@ -264,6 +260,14 @@ class Dht22(Sensor):
 
         self.pin = configuration["gpioAddress"]
         self.dht22 = _DHT22(pigpio.pi(), self.pin)
+
+    async def clean_up(self):
+        try:
+            self.dht22.cancel()
+        except Exception:
+            pass
+
+        self.dht22.pi.stop()
 
     async def measure(self):
         successful_message_count_before = self.dht22.successful_message()
