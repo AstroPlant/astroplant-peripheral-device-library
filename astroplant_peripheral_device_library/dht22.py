@@ -293,4 +293,6 @@ class Dht22(Sensor):
             return [temperature_measurement, humidity_measurement]
         else:
             # No valid measurement was made
-            return []
+            raise TemporaryPeripheralError(
+                "sensor failed to produce a measurement (DHT22)"
+            )
