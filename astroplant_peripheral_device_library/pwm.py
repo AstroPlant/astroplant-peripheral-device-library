@@ -11,6 +11,9 @@ class Pwm(Actuator):
         for pin in self.pins:
             self.pi.set_PWM_range(pin, 100)
 
+    async def clean_up(self):
+        self.pi.stop()
+
     def _intensity_transform(self, intensity):
         return intensity
 
