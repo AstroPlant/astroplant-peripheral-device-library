@@ -42,7 +42,11 @@ class Bh1750(Sensor):
         address = int(configuration["i2cAddress"], base=16)
         self.i2c_device = i2c.I2cDevice(address)
 
+    async def set_up(self):
         self.set_sensitivity()
+
+    async def clean_up(self):
+        self.i2c_device.stop()
 
     def _set_mode(self, mode):
         self.mode = mode
