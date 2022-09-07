@@ -15,6 +15,9 @@ class LedPanel(Actuator):
         self.pi.set_PWM_range(self._red_pin, 100)
         self.pi.set_PWM_range(self._far_red_pin, 100)
 
+    async def clean_up(self):
+        self.pi.stop()
+
     async def do(self, command):
         if "blue" in command:
             self.pi.set_PWM_dutycycle(self._blue_pin, command["blue"])
