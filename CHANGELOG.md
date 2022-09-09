@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0b8] - 2022-09-09
+
+### Fix
+
+- DHT22: wait for measurement (regression introduced in 1.0.0b7)
+
 ## [1.0.0b7] - 2022-09-08
 
 ### Changed
