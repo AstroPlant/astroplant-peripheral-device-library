@@ -3,6 +3,7 @@ Based on:
 https://github.com/joan2937/pigpio/blob/master/EXAMPLES/Python/DHT22_AM2302_SENSOR/DHT22.py
 """
 
+import threading
 import time
 
 import pigpio
@@ -63,6 +64,7 @@ class _DHT22:
         self.powered = True
 
         self.cb = None
+        self.msg_event = threading.Event()
 
         self.suc_M = 0  # Successful message count.
         self.bad_CS = 0  # Bad checksum count.
@@ -137,6 +139,7 @@ class _DHT22:
                         self.tov = time.time()
 
                         self.suc_M += 1
+                        self.msg_event.set()
                         if self.LED is not None:
                             self.pi.write(self.LED, 0)
 
@@ -234,10 +237,15 @@ class _DHT22:
             if self.LED is not None:
                 self.pi.write(self.LED, 1)
 
+            self.msg_event.clear()
+
             self.pi.write(self.gpio, pigpio.LOW)
             time.sleep(0.017)  # 17 ms
             self.pi.set_mode(self.gpio, pigpio.INPUT)
             self.pi.set_watchdog(self.gpio, 200)
+
+            # Wait for a successful message
+            self.msg_event.wait(timeout=5.0)
 
     def cancel(self):
         """Cancel the DHT22 sensor."""
